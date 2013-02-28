@@ -5,12 +5,14 @@ require 'hpricot'
 require 'models.rb'
 
 URL = "http://exrx.net/"
+$current_group = nil
 
 def collect_muscles(lis)
   lis.map do |li|
     puts "\t\t"+li.inner_text.split.join(" ")
     Muscle.find_or_create_by_name((li/"a").inner_text.split.join(" "))
-  end  
+  end
+
 end
 
 def parse_exercises(doc, ex_obj)
@@ -25,6 +27,7 @@ def parse_exercises(doc, ex_obj)
     when /Target/
       puts "\tTargets"
       ex_obj.targets = collect_muscles(p.next_sibling/"li")
+      $current_group.muscles << ex_obj.targets.last
     when /Synergists/
       puts "\tSynergists"
       ex_obj.synergists = collect_muscles(p.next_sibling/"li")
@@ -39,6 +42,7 @@ def parse_exercise(path)
   if title
     puts title.inner_text.split().join(" ")
     ex_obj = Exercise.new(name: title.inner_text.split().join(" "))
+    $current_group.exercises << ex_obj
     parse_exercises(doc, ex_obj)
     ex_obj.save
   end
@@ -55,10 +59,10 @@ def parse_exercise_index()
   path = URI.join(URL, "Lists/Directory.html").to_s
   doc = open(path) {|f| Hpricot(f) }
   (doc/"ul").first.search("/li").each do |li|
+    $current_group = Group.find_or_create_by_name((li/"/a").inner_text.split.join(" "))
     parse_muscle_group(URI.join(path, (li/"/a").first['href']))
   end
 end
 
 
 parse_exercise_index()
-
